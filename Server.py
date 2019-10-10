@@ -3,6 +3,7 @@ import RDT
 import time
 
 
+#Return Pig Latin version of a given word
 def makePigLatin(word):
     m  = len(word)
     vowels = "a", "e", "i", "o", "u", "y" 
@@ -17,6 +18,8 @@ def makePigLatin(word):
         else:
             return word[m:]+word[:m]+"ay" 
 
+
+#Return Pig Latin version of a sentence string
 def piglatinize(message):
     essagemay = ""
     message = message.strip(".")
@@ -25,6 +28,7 @@ def piglatinize(message):
     return essagemay.strip()+"."
 
 
+#Server begins here
 if __name__ == '__main__':
     parser =  argparse.ArgumentParser(description='Pig Latin conversion server.')
     parser.add_argument('port', help='Port.', type=int)
@@ -33,9 +37,10 @@ if __name__ == '__main__':
     timeout = 5 #close connection if no new data within 5 seconds
     time_of_last_data = time.time()
     
+    #Listen for requests, pig-latinize, and respond
     rdt = RDT.RDT('server', None, args.port)
     while(True):
-        #try to receiver message before timeout
+        #try to receive message before timeout
         msg_S = rdt.rdt_1_0_receive()
         if msg_S is None:
             if time_of_last_data + timeout < time.time():
@@ -50,7 +55,3 @@ if __name__ == '__main__':
         rdt.rdt_1_0_send(rep_msg_S)
         
     rdt.disconnect()
-
-    
-    
-    
