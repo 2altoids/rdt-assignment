@@ -34,7 +34,7 @@ if __name__ == '__main__':
     parser.add_argument('port', help='Port.', type=int)
     args = parser.parse_args()
     
-    timeout = 5 #close connection if no new data within 5 seconds
+    timeout = 15 #close connection if no new data within 15 seconds
     time_of_last_data = time.time()
     
     #Listen for requests, pig-latinize, and respond
@@ -54,4 +54,5 @@ if __name__ == '__main__':
         print('Converted %s \nto \n%s\n' % (msg_S, rep_msg_S))
         rdt.rdt_1_0_send(rep_msg_S)
         
+    print 'Server timed out.  Attempts to reach me now will result in Errno 32 Broken Pipe!'
     rdt.disconnect()
