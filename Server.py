@@ -54,5 +54,5 @@ if __name__ == '__main__':
         print('Converted %s \nto \n%s\n' % (msg_S, rep_msg_S))
         rdt.rdt_2_1_send(rep_msg_S)
         
-    print 'Server timed out.  Attempts to reach me now will result in Errno 32 Broken Pipe!'
+    print('Server timed out.  Attempts to reach me now will result in Errno 32 Broken Pipe!')
     rdt.disconnect()
