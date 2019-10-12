@@ -41,7 +41,7 @@ if __name__ == '__main__':
     rdt = RDT.RDT('server', None, args.port)
     while(True):
         #try to receive message before timeout
-        msg_S = rdt.rdt_2_1_receive()
+        msg_S, seq_num = rdt.rdt_2_1_receive()
         if msg_S is None:
             if time_of_last_data + timeout < time.time():
                 break
