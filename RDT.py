@@ -6,8 +6,8 @@ import hashlib
 
 class Packet:
     ## the number of bytes used to store packet length
-    seq_num_S_length = 9
-    length_S_length = 9
+    seq_num_S_length = 10
+    length_S_length = 10
     ## length of md5 checksum in hex
     checksum_length = 32 
         
@@ -20,9 +20,9 @@ class Packet:
     
     @classmethod
     def from_byte_S(self, byte_S):
-        #if Packet.corrupt(byte_S):
-        #    raise RuntimeError('Cannot initialize Packet: byte_S is corrupt')
-        #extract the fields
+        if Packet.corrupt(byte_S):
+            raise RuntimeError('Cannot initialize Packet: byte_S is corrupt')
+        # extract the fields
         seq_num = int(byte_S[Packet.length_S_length : Packet.length_S_length+Packet.seq_num_S_length])
         msg_S = byte_S[Packet.length_S_length+Packet.seq_num_S_length+Packet.checksum_length :]
         return self(seq_num, msg_S)
@@ -54,15 +54,15 @@ class Packet:
         #and check if the same
         return checksum_S != computed_checksum_S
         
-        
-    def sendACK(self, network):
-        ack = Packet(self.seq_num, 'ACK')
+    @staticmethod
+    def sendACK(network, seq_num):
+        ack = Packet(seq_num, 'ACK')
         network.udt_send(ack.get_byte_S())
         
-        
-    def sendNAK(self, network):
-        ack = Packet(self.seq_num, 'NAK')
-        network.udt_send(ack.get_byte_S())
+    @staticmethod
+    def sendNAK(network):
+        ack = Packet(999, 'NAK')
+
         
 
 class RDT:
@@ -73,7 +73,6 @@ class RDT:
 
     def __init__(self, role_S, server_S, port):
         self.network = Network.NetworkLayer(role_S, server_S, port)
-        self.expecting_acknowledgements = False #Do not send acknowledgements when true
     
     def disconnect(self):
         self.network.disconnect()
@@ -86,6 +85,28 @@ class RDT:
             
     
     def rdt_2_1_send(self, msg_S):
+        send_packet = Packet(self.seq_num, msg_S)
+
+        while True:
+            self.network.udt_send(send_packet.get_byte_S())
+            self.byte_buffer = ''
+
+            while self.byte_buffer == '':  # receive a packet
+                self.byte_buffer = self.network.udt_receive()
+
+            length = int(self.byte_buffer[:Packet.length_S_length])  # Extract the length of the packet
+            if Packet.corrupt(self.byte_buffer[:length]):  # if received packet corrupt resend
+                send_packet = Packet(self.seq_num, msg_S)
+                continue
+            receive_packet = Packet.from_byte_S(self.byte_buffer[:length])
+            if receive_packet.msg_S == "NAK":
+                continue
+            if receive_packet.msg_S == "ACK":
+                break
+        self.seq_num += 1
+
+
+        """
         p = Packet(self.seq_num, msg_S)
         
         self.network.udt_send(p.get_byte_S())
@@ -113,41 +134,37 @@ class RDT:
                 self.expecting_acknowledgements = False
                 break
         self.seq_num += 1
+        """
         
     def rdt_2_1_receive(self):
         ret_S = None
         reply_seq_num = None
         byte_S = self.network.udt_receive()
         self.byte_buffer += byte_S
-        #keep extracting packets - if reordered, could get more than one
+        # keep extracting packets - if reordered, could get more than one
         while True:
-            #check if we have received enough bytes
-            if(len(self.byte_buffer) < Packet.length_S_length):
-                return ret_S, reply_seq_num #not enough bytes to read packet length
-            #extract length of packet
+            # check if we have received enough bytes
+            if len(self.byte_buffer) < Packet.length_S_length:
+                return ret_S, reply_seq_num  # not enough bytes to read packet length
+            # extract length of packet
             length = int(self.byte_buffer[:Packet.length_S_length])
             if len(self.byte_buffer) < length:
-                return ret_S, reply_seq_num #not enough bytes to read the whole packet
-            #create packet from buffer content and add to return string
-            p = Packet.from_byte_S(self.byte_buffer[0:length])
-            if (not Packet.corrupt(self.byte_buffer[0:length])):
-                ret_S = p.msg_S if (ret_S is None) else ret_S + p.msg_S
-            
-            #send acknowledgement for received packet, ignoring acknowledgement packets
-            if (self.expecting_acknowledgements is False):
-                if (Packet.corrupt(self.byte_buffer[0:length])):
-                    p.sendNAK(self.network)
-                    #print 'Sent NAK'
-                    continue
-                else:
-                    p.sendACK(self.network)
-                    #print 'Sent ACK'
-                    self.seq_num += 1
+                return ret_S, reply_seq_num  # not enough bytes to read the whole packet
+            # create packet from buffer content and add to return string
+            if Packet.corrupt(self.byte_buffer[0:length]):
+                self.network.udt_send(Packet(self.seq_num, 'NAK').get_byte_S())
+                return ret_S, reply_seq_num
+            receive_packet = Packet.from_byte_S(self.byte_buffer[0:length])
+            ret_S = receive_packet.msg_S if (ret_S is None) else ret_S + receive_packet.msg_S
+            Packet.sendACK(self.network, receive_packet.seq_num)
+            # print 'Sent ACK'
+            if self.seq_num == receive_packet.seq_num:
+                self.seq_num += 1
                 
-            #remove the packet bytes from the buffer
+            # remove the packet bytes from the buffer
             self.byte_buffer = self.byte_buffer[length:]
-            reply_seq_num = p.get_seq_num()
-            #if this was the last packet, will return on the next iteration
+            reply_seq_num = receive_packet.get_seq_num()
+            # if this was the last packet, will return on the next iteration
     
     def rdt_3_0_send(self, msg_S):
         pass
@@ -176,8 +193,3 @@ if __name__ == '__main__':
         print(rdt.rdt_1_0_receive())
         rdt.rdt_1_0_send('MSG_FROM_SERVER')
         rdt.disconnect()
-        
-
-
-        
-        
