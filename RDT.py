@@ -142,10 +142,11 @@ class RDT:
             # create packet from buffer content and add to return string
             if Packet.corrupt(self.byte_buffer[0:length]):
                 self.network.udt_send(Packet(self.seq_num, 'NAK').get_byte_S())
+                #print 'exdee'
             else:
                 receive_packet = Packet.from_byte_S(self.byte_buffer[0:length])
                 ret_S = receive_packet.msg_S if (ret_S is None) else ret_S + receive_packet.msg_S
-
+                #print 'times three'
                 self.network.udt_send(Packet(receive_packet.seq_num, 'ACK').get_byte_S())
                 # print 'Sent ACK'
                 if self.seq_num == receive_packet.seq_num:
